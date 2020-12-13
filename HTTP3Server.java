@@ -13,7 +13,6 @@ public class HTTP3Server{
     public static ThreadManager threadManager;
     public static ServerSocket serverSocket;
 
-    public static int testcase = 0;
     public static String serverIP = null;
     public static String serverPort = null;
 

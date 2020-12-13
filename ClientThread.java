@@ -33,43 +33,23 @@ public class ClientThread extends Thread{
 	/**Main thread method */
     public void run(){
 
-        //testcase = HTTP1Server.testcase;
-
-        //System.out.println(testcase);
 
         //Create input stream and read from client
         ArrayList<String> request = new ArrayList<String>();
-
-        //println("\n=============================\n");
-        //println("Test Case " + testcase + "\n");
-        
-        //println("# Request:");
-
 
 
         try{
         	clientSocket.setSoTimeout(5000);
             BufferedReader inFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             
-            System.out.println("====New Request====");
+            //New Request
+            //System.out.println("====New Request====");
             do{
                 String line = inFromClient.readLine();
                 request.add(line);
                 System.out.println(line);
             }while(inFromClient.ready());
             System.out.println();
-
-            /*
-            String line;
-            while (!(line = inFromClient.readLine()).isEmpty()) {
-                request.add(line);
-                System.out.println(line);
-            }
-            if(line.isEmpty()){
-                System.out.println("<Empty line>");
-                System.out.println("Has next line: " + inFromClient.ready());
-            }
-            */
 
 
         }catch(SocketException e){
@@ -83,9 +63,6 @@ public class ClientThread extends Thread{
             writeToClient("HTTP/1.0 500 Internal Server Error", null, true);
             return;
         }
-
-        //println();
-        //println("# Debug:");
 
 
         //Parse client request
@@ -173,13 +150,14 @@ public class ClientThread extends Thread{
             File file = new File(resource.substring(1)); 
             String cookie = null;
             System.out.println("resource: " + resource.substring(1));
+
+            //if requesting root
             if(resource.equals("/")){
                 for(int i = 1; i < request.size(); i++){
                     if(request.get(i).contains("Cookie: ")){
                         cookie = request.get(i).replace("Cookie: lasttime=", "");
                         //check if cookie is before or on current day
                         if(!isCookieValid(cookie, getEncodedDateTime())){
-                            System.out.println("Cookie is not valid");
                             cookie = null;
                         }
                         System.out.println(cookie);
@@ -241,10 +219,6 @@ public class ClientThread extends Thread{
             //send message for POST
             if(command.equals("POST")){
 
-                File program = new File(resource);
-                //println("can execute: " + program.canExecute());
-                
-
                 //decode
                 String arg1 = "."+resource; 
                 int paramSepIndex = 0;
@@ -257,9 +231,7 @@ public class ClientThread extends Thread{
                     param += request.get(paramSepIndex);
                     paramSepIndex++;
                 }                
-                //System.out.println("decode: " + param);
                 String arg2 = decode(param);
-                //println(arg1 + " " + arg2);
 
                 //set environment vars
                 //envMap.put("CONTENT_LENGTH", Integer.toString(arg2.getBytes().length));
@@ -306,7 +278,6 @@ public class ClientThread extends Thread{
             //send message for GET and HEAD
             if(!ifModifiedSince && !command.equals("HEAD")){   //Create body for GET
 
-                //BufferedReader in = new BufferedReader(new FileInputStream(file));
                 FileInputStream fis = new FileInputStream(file);
                 String body = "";
                 int charInt;
@@ -329,10 +300,6 @@ public class ClientThread extends Thread{
                 fis.close();
                 writeToClient(msg, bodyList, false);
 
-                /*
-                writeToClient(msg, body, false);
-                fis.close();
-                */
                 return;
 
             }else{  //Write header only if HEAD or IF-MODIFIED-SINCE
@@ -349,7 +316,7 @@ public class ClientThread extends Thread{
     }
 
     
-
+    /** returns encoded date time */
     public String getEncodedDateTime(){
         LocalDateTime myDateObj = LocalDateTime.now();
         DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -364,6 +331,7 @@ public class ClientThread extends Thread{
         }
     }
 
+    /** returns decoded date time */
     public String getDecodedDateTime(String encoded){
         try{
             String decoded = URLDecoder.decode(encoded, "UTF-8");
@@ -383,12 +351,9 @@ public class ClientThread extends Thread{
     }
 
 
-
     //Create output stream and write <msg> to client, closes socket
     public void writeToClient(String msg, ArrayList<byte[]> body, boolean error){
         
-        //println("\n# Response: " + msg);
-
         try{
             BufferedOutputStream outToClient = new BufferedOutputStream(clientSocket.getOutputStream());
 
@@ -406,26 +371,12 @@ public class ClientThread extends Thread{
             println(msg);
             
             if( body != null){
-                println("=====StartBody, size("+ body.size()+")======");
+                //println("=====StartBody, size("+ body.size()+")======");
             	for(int i = 0; i < body.size(); i++){
                     outToClient.write(body.get(i));
-                    System.out.println(new String(body.get(i)));
-                    /*
-                    if(testcase == debug){
-                       outToFile.write(body.get(i));
-                    }
-                    */
-                   // String str = new String(body.get(i));
-                    ////println(str);
                 }
-                println("==========END BODY (length:" + body.get(0).length+")========");
+                //println("==========END BODY (length:" + body.get(0).length+")========");
             }
-            /*
-            if(testcase == debug){
-                outToFile.flush();
-                outToFile.close();
-            }
-            */
             outToClient.flush();
 
 
@@ -478,21 +429,4 @@ public class ClientThread extends Thread{
 		return str;
 	}
 
-    public void println(String s){
-       // if(testcase == debug){
-            System.out.println(s);
-        //}
-    }
-
-    public void println(){
-        //if(testcase == debug){
-            System.out.println();
-        //}
-    }
-
-    public void print(String s){
-       // if(testcase == debug){
-            System.out.print(s);
-        //}
-    }
 }
