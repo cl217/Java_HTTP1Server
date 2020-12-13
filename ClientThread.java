@@ -43,13 +43,12 @@ public class ClientThread extends Thread{
             BufferedReader inFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             
             //New Request
-            //System.out.println("====New Request====");
+            System.out.println("\n====New Request====");
             do{
                 String line = inFromClient.readLine();
                 request.add(line);
                 System.out.println(line);
             }while(inFromClient.ready());
-            System.out.println();
 
 
         }catch(SocketException e){
@@ -59,7 +58,6 @@ public class ClientThread extends Thread{
         	writeToClient("HTTP/1.0 408 Request Timeout", null, true);
         	return;
         }catch(IOException e){
-            //System.out.println("46 Error 500");
             writeToClient("HTTP/1.0 500 Internal Server Error", null, true);
             return;
         }
@@ -149,7 +147,7 @@ public class ClientThread extends Thread{
             //read resource
             File file = new File(resource.substring(1)); 
             String cookie = null;
-            System.out.println("resource: " + resource.substring(1));
+            //System.out.println("resource: " + resource.substring(1));
 
             //if requesting root
             if(resource.equals("/")){
@@ -157,10 +155,11 @@ public class ClientThread extends Thread{
                     if(request.get(i).contains("Cookie: ")){
                         cookie = request.get(i).replace("Cookie: lasttime=", "");
                         //check if cookie is before or on current day
+                        System.out.println(cookie);
                         if(!isCookieValid(cookie, getEncodedDateTime())){
+                            System.out.println("invalid cookie");
                             cookie = null;
                         }
-                        System.out.println(cookie);
                         break;
                     }
                 }
@@ -286,11 +285,6 @@ public class ClientThread extends Thread{
                 } 
 
                 if(cookie!=null){
-                    if(body.contains("%YEAR-%MONTH-%DAY %HOUR-%MINUTE-%SECOND")){
-                        System.out.println("str found");
-                    }else{
-                        System.out.println("str not found");
-                    }
                     body = body.replace("%YEAR-%MONTH-%DAY %HOUR-%MINUTE-%SECOND", getDecodedDateTime(cookie));
                 }
                 msg+="Content-Length: " + body.length() + "\r\n\r\n";
@@ -326,7 +320,6 @@ public class ClientThread extends Thread{
             return encodedDateTime;
 
         }catch(UnsupportedEncodingException e){
-            System.out.println("encoding error");   
             return null;
         }
     }
@@ -368,14 +361,18 @@ public class ClientThread extends Thread{
             }
 
             outToClient.write(msg.getBytes());
-            println(msg);
+
+            System.out.println("Sending to client:");
+            System.out.println(msg);
             
             if( body != null){
-                //println("=====StartBody, size("+ body.size()+")======");
+               // System.out.println("=====StartBody, size("+ body.size()+")======");
             	for(int i = 0; i < body.size(); i++){
                     outToClient.write(body.get(i));
+                    //System.out.println(new String(body.get(i)));
                 }
-                //println("==========END BODY (length:" + body.get(0).length+")========");
+                //System.out.println("==========END BODY (length:" + body.get(0).length+")========");
+                System.out.println("Body length(" + body.get(0).length+")");
             }
             outToClient.flush();
 
@@ -394,22 +391,23 @@ public class ClientThread extends Thread{
         }
     }
 
+    /** returns true if cookie is before or equal to current time, else false */
     public boolean isCookieValid(String encodedCookie, String encodedCurrentTime){
+        if(encodedCookie == null || encodedCurrentTime == null){
+            return false;
+        }
         try{
             SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             String decodedCookie = URLDecoder.decode(encodedCookie, "UTF-8");
             String decodedCurrentTime = URLDecoder.decode(encodedCurrentTime, "UTF-8");
-            System.out.println("Cookie:  " + decodedCookie);
-            System.out.println("Current: " + decodedCurrentTime);
 
-            boolean isValid = format.parse(decodedCurrentTime).after(format.parse(decodedCookie));
-            System.out.println("isValid: " + isValid);
-            return isValid;
+            if( format.parse(decodedCurrentTime).compareTo(format.parse(decodedCookie)) > -1){
+                return true;
+            }
+            return false;
         }catch(UnsupportedEncodingException e){
-            System.out.println("e1");
             return false;
         }catch(ParseException e){
-            System.out.println("e2");
             return false;
         }
     }

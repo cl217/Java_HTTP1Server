@@ -40,7 +40,6 @@ public class HTTP3Server{
                     sendUnavailable(clientSocket);
                 }else{
                     clientThread.start();
-                    testcase++;
                 }
             }
         }catch(IOException e){
