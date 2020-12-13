@@ -9,15 +9,16 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import org.w3c.dom.Text;
 
 
 public class ClientThread extends Thread{
 
     public Socket clientSocket;
-    int debug = 26;
-    int testcase = -1;
+    //int debug = 26;
+    //int testcase = -1;
     
     /** Initializers */
     public ClientThread(){}
@@ -32,7 +33,7 @@ public class ClientThread extends Thread{
 	/**Main thread method */
     public void run(){
 
-        testcase = HTTP1Server.testcase;
+        //testcase = HTTP1Server.testcase;
 
         //System.out.println(testcase);
 
@@ -50,11 +51,13 @@ public class ClientThread extends Thread{
         	clientSocket.setSoTimeout(5000);
             BufferedReader inFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             
+            System.out.println("====New Request====");
             do{
                 String line = inFromClient.readLine();
                 request.add(line);
-
+                System.out.println(line);
             }while(inFromClient.ready());
+            System.out.println();
 
             /*
             String line;
@@ -168,7 +171,28 @@ public class ClientThread extends Thread{
         try{
             //read resource
             File file = new File(resource.substring(1)); 
-            if(!file.exists()){
+            String cookie = null;
+            System.out.println("resource: " + resource.substring(1));
+            if(resource.equals("/")){
+                for(int i = 1; i < request.size(); i++){
+                    if(request.get(i).contains("Cookie: ")){
+                        cookie = request.get(i).replace("Cookie: lasttime=", "");
+                        //check if cookie is before or on current day
+                        if(!isCookieValid(cookie, getEncodedDateTime())){
+                            System.out.println("Cookie is not valid");
+                            cookie = null;
+                        }
+                        System.out.println(cookie);
+                        break;
+                    }
+                }
+                if(cookie!=null){
+                    file = new File("index_seen.html");
+                }else{
+                    file = new File("index.html");
+                }
+
+            }if(!file.exists()){
                 writeToClient("HTTP/1.0 404 Not Found", null, true);
                 return;
             }
@@ -199,16 +223,6 @@ public class ClientThread extends Thread{
             msg += "Allow: " + "GET, POST, HEAD"+ "\r\n";
             msg += "Content-Encoding: " + "identity" + "\r\n";
             
-            /*
-            if(testcase == 26){
-                msg += "Content-Length: 500\r\n";
-            }else{
-                msg += "Content-Length: " + file.length() + "\r\n";
-            }
-            */
-
-
-
             String contentType = Files.probeContentType(Paths.get(file.getName()));
             if(command.equals("POST")){
                 contentType = "text/html";
@@ -217,6 +231,9 @@ public class ClientThread extends Thread{
                 contentType = "application/octet-stream";
             }
             msg += "Content-Type: " + contentType + "\r\n";
+
+            msg += "Set-Cookie: lasttime=" + getEncodedDateTime() + "\r\n"; 
+
             msg += "Expires: " + "Thu, 01 Dec 2021 16:00:00 GMT"+ "\r\n";
             msg += "Last-Modified: " + formatDate(file.lastModified())+ "\r\n";
             //msg += "\r\n";
@@ -247,8 +264,8 @@ public class ClientThread extends Thread{
                 //set environment vars
                 //envMap.put("CONTENT_LENGTH", Integer.toString(arg2.getBytes().length));
                 envMap.put("SCRIPT_NAME", resource);
-                envMap.put("SERVER_NAME", HTTP1Server.serverIP);
-                envMap.put("SERVER_PORT", HTTP1Server.serverPort);
+                envMap.put("SERVER_NAME", HTTP3Server.serverIP);
+                envMap.put("SERVER_PORT", HTTP3Server.serverPort);
 
 
                 //process bulder
@@ -283,70 +300,40 @@ public class ClientThread extends Thread{
                     return;
                 }
 
-
-                /*
-                InputStream in = process.getInputStream();
-                byte[] buffer = new byte[1024*1024];
-                ArrayList<byte[]> body = new ArrayList<byte[]>();
-                while( in.read(buffer) > 0 ){	
-                    body.add(buffer);
-                    println(new String(buffer)); 
-                }
-                writeToClient(msg, body);
-                in.close();
-                */
-
-                /*
-                BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                String body = "";
-                String line;
-                ArrayList<byte[]> bodyList = new ArrayList<byte[]>();
-                while ((line = in.readLine()) != null) {
-                    bodyList.add(line.getBytes());
-                    println("0:"+line);
-                }
-                
-                //body = body.substring(0, body.length()-1);
-                //bodyList.add(body.getBytes());
-                writeToClient(msg, bodyList);
-                */
-
                 return;
             }
 
             //send message for GET and HEAD
             if(!ifModifiedSince && !command.equals("HEAD")){   //Create body for GET
 
+                //BufferedReader in = new BufferedReader(new FileInputStream(file));
                 FileInputStream fis = new FileInputStream(file);
-                byte[] buffer = new byte[1024*1024];
-                ArrayList<byte[]> body = new ArrayList<byte[]>();
-                while( fis.read(buffer) > 0 ){	
-                 	body.add(buffer);
+                String body = "";
+                int charInt;
+                while((charInt=fis.read()) != -1){
+                    body += (char) charInt;
+                } 
+
+                if(cookie!=null){
+                    if(body.contains("%YEAR-%MONTH-%DAY %HOUR-%MINUTE-%SECOND")){
+                        System.out.println("str found");
+                    }else{
+                        System.out.println("str not found");
+                    }
+                    body = body.replace("%YEAR-%MONTH-%DAY %HOUR-%MINUTE-%SECOND", getDecodedDateTime(cookie));
                 }
-                msg+="Content-Length: " + file.length() + "\r\n\r\n";
-                writeToClient(msg, body, false);
+                msg+="Content-Length: " + body.length() + "\r\n\r\n";
+
+                ArrayList<byte[]> bodyList = new ArrayList<byte[]>();
+                bodyList.add(body.getBytes());
                 fis.close();
-                return;
+                writeToClient(msg, bodyList, false);
 
                 /*
-                ArrayList<byte[]> body = new ArrayList<byte[]>();
-                BufferedReader in = new BufferedReader(new FileReader(file));
-                String getbody = "";
-                int charInt;
-                int max = 1024*1024;
-                while((charInt=in.read()) != -1){
-                    getbody += (char) charInt;
-                } 
-                body.add(getbody.getBytes());
-                in.close();
                 writeToClient(msg, body, false);
-                return;
+                fis.close();
                 */
-
-
-
-
-
+                return;
 
             }else{  //Write header only if HEAD or IF-MODIFIED-SINCE
                 writeToClient(msg, null, false);
@@ -361,6 +348,32 @@ public class ClientThread extends Thread{
         }
     }
 
+    
+
+    public String getEncodedDateTime(){
+        LocalDateTime myDateObj = LocalDateTime.now();
+        DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String formattedDate = myDateObj.format(myFormatObj);
+        try{
+            String encodedDateTime = URLEncoder.encode(formattedDate, "UTF-8");
+            return encodedDateTime;
+
+        }catch(UnsupportedEncodingException e){
+            System.out.println("encoding error");   
+            return null;
+        }
+    }
+
+    public String getDecodedDateTime(String encoded){
+        try{
+            String decoded = URLDecoder.decode(encoded, "UTF-8");
+            decoded = decoded.replace(":", "-");
+            return decoded;
+        }catch(UnsupportedEncodingException e){
+            return null;
+        }
+    }
+
     //format date
     public String formatDate( long seconds ){
         Date date = new Date(seconds);
@@ -368,6 +381,8 @@ public class ClientThread extends Thread{
         format.setTimeZone(TimeZone.getTimeZone("GMT"));
         return format.format(date);
     }
+
+
 
     //Create output stream and write <msg> to client, closes socket
     public void writeToClient(String msg, ArrayList<byte[]> body, boolean error){
@@ -388,13 +403,13 @@ public class ClientThread extends Thread{
             }
 
             outToClient.write(msg.getBytes());
-            //println(msg);
+            println(msg);
             
             if( body != null){
-                //println("=====StartBody(" +testcase +"),size("+ body.size()+")======");
+                println("=====StartBody, size("+ body.size()+")======");
             	for(int i = 0; i < body.size(); i++){
                     outToClient.write(body.get(i));
-
+                    System.out.println(new String(body.get(i)));
                     /*
                     if(testcase == debug){
                        outToFile.write(body.get(i));
@@ -403,7 +418,7 @@ public class ClientThread extends Thread{
                    // String str = new String(body.get(i));
                     ////println(str);
                 }
-                //println("==========END BODY (length:" + body.get(0).length+")========");
+                println("==========END BODY (length:" + body.get(0).length+")========");
             }
             /*
             if(testcase == debug){
@@ -421,10 +436,30 @@ public class ClientThread extends Thread{
 
             outToClient.close();
             clientSocket.close();
-            HTTP1Server.threadManager.removeClient(this);
+            HTTP3Server.threadManager.removeClient(this);
             //return
         }catch(IOException e){
             //e.printStackTrace();
+        }
+    }
+
+    public boolean isCookieValid(String encodedCookie, String encodedCurrentTime){
+        try{
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String decodedCookie = URLDecoder.decode(encodedCookie, "UTF-8");
+            String decodedCurrentTime = URLDecoder.decode(encodedCurrentTime, "UTF-8");
+            System.out.println("Cookie:  " + decodedCookie);
+            System.out.println("Current: " + decodedCurrentTime);
+
+            boolean isValid = format.parse(decodedCurrentTime).after(format.parse(decodedCookie));
+            System.out.println("isValid: " + isValid);
+            return isValid;
+        }catch(UnsupportedEncodingException e){
+            System.out.println("e1");
+            return false;
+        }catch(ParseException e){
+            System.out.println("e2");
+            return false;
         }
     }
 

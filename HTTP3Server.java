@@ -8,7 +8,7 @@ import java.lang.Integer;
 import java.util.*;
 import java.io.*;
 
-public class HTTP1Server{
+public class HTTP3Server{
 
     public static ThreadManager threadManager;
     public static ServerSocket serverSocket;
