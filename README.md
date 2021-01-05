@@ -1,3 +1,3 @@
 Java HTTP1 Server
 
-Supports POST, HEAD, GET
+Supports POST, HEAD, GET, and Cookies
